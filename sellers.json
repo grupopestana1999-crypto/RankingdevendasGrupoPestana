@@ -1,0 +1,17 @@
+[
+  {
+    "id": "vendedor-1",
+    "name": "Colaborador 01",
+    "code": "VENDEDOR01"
+  },
+  {
+    "id": "vendedor-2",
+    "name": "Colaborador 02",
+    "code": "VENDEDOR02"
+  },
+  {
+    "id": "vendedor-3",
+    "name": "Colaborador 03",
+    "code": "VENDEDOR03"
+  }
+]

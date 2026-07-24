@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Arena • Ranking Hotmart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #06070a;
+      --panel: rgba(16, 18, 24, .82);
+      --panel-2: rgba(25, 28, 37, .76);
+      --line: rgba(255,255,255,.08);
+      --text: #f6f7fb;
+      --muted: #8c93a7;
+      --green: #3df58b;
+      --purple: #8e6cff;
+      --gold: #f8c550;
+      --silver: #c8cfdb;
+      --bronze: #c58458;
+      --danger: #ff5b6e;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+    body {
+      background:
+        radial-gradient(circle at 15% 15%, rgba(142,108,255,.14), transparent 28%),
+        radial-gradient(circle at 85% 10%, rgba(61,245,139,.10), transparent 25%),
+        #06070a;
+    }
+
+    .wrap { width: min(1440px, 94vw); margin: 0 auto; padding: 30px 0 42px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 28px; }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .logo {
+      width: 48px; height: 48px; border-radius: 15px;
+      display:grid; place-items:center; font-weight:900; color:#07100b;
+      background: linear-gradient(135deg, var(--green), #8effbe);
+      box-shadow: 0 0 38px rgba(61,245,139,.15);
+    }
+    .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.04em; }
+    .brand p { color: var(--muted); margin: 4px 0 0; font-size: 12px; }
+
+    .live { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#b8ffcf; border:1px solid rgba(61,245,139,.2); padding:10px 13px; border-radius:999px; background:rgba(61,245,139,.07); }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 0 5px rgba(61,245,139,.08); animation:pulse 1.8s infinite; }
+    @keyframes pulse { 50% { opacity:.5; transform:scale(.8);} }
+
+    .filters { display:flex; gap:8px; background:rgba(255,255,255,.035); border:1px solid var(--line); padding:5px; border-radius:14px; }
+    .filters button { border:0; background:transparent; color:var(--muted); font:inherit; font-size:12px; font-weight:700; padding:9px 14px; border-radius:10px; cursor:pointer; }
+    .filters button.active { color:#fff; background:rgba(255,255,255,.09); }
+
+    .hero { display:grid; grid-template-columns: 1.6fr .8fr .8fr; gap:14px; margin-bottom:18px; }
+    .card { border:1px solid var(--line); background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)); border-radius:22px; padding:22px; backdrop-filter: blur(16px); box-shadow:0 20px 70px rgba(0,0,0,.22); }
+    .label { color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; }
+    .big { font-size:44px; line-height:1; letter-spacing:-.055em; font-weight:900; margin:14px 0 8px; }
+    .stat { font-size:28px; line-height:1; letter-spacing:-.045em; font-weight:850; margin:16px 0 6px; }
+    .sub { color:var(--muted); font-size:12px; }
+
+    .section-head { display:flex; justify-content:space-between; align-items:end; margin:28px 2px 12px; }
+    .section-head h2 { margin:0; font-size:17px; letter-spacing:-.03em; }
+    .section-head span { color:var(--muted); font-size:12px; }
+
+    .ranking { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
+    .seller { position:relative; overflow:hidden; min-height:190px; }
+    .seller::after { content:""; position:absolute; width:130px; height:130px; border-radius:50%; right:-45px; top:-50px; background:var(--accent); filter:blur(60px); opacity:.17; }
+    .position { display:inline-flex; align-items:center; justify-content:center; height:29px; min-width:29px; padding:0 10px; border-radius:999px; font-weight:900; font-size:11px; color:#08090c; background:var(--accent); }
+    .seller-name { font-size:21px; font-weight:850; margin:17px 0 4px; letter-spacing:-.04em; }
+    .seller-code { color:var(--muted); font-size:11px; }
+    .seller-numbers { display:flex; justify-content:space-between; gap:16px; margin-top:26px; }
+    .seller-numbers b { display:block; font-size:18px; letter-spacing:-.03em; }
+    .seller-numbers small { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+
+    .table-card { padding: 5px 18px 10px; overflow:hidden; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:16px 10px; text-align:left; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.09em; font-weight:700; }
+    td { font-size:12px; }
+    td strong { font-size:13px; }
+    tr:last-child td { border-bottom:0; }
+    .money { font-weight:800; color:#f7f8fb; }
+    .commission { color:var(--green); font-weight:800; }
+    .pill { display:inline-flex; align-items:center; padding:7px 9px; border-radius:9px; background:rgba(255,255,255,.05); color:#d8dbe6; font-size:10px; font-weight:700; }
+    .empty { color:var(--muted); text-align:center; padding:34px 10px; }
+
+    .flash { animation: flash .8s ease; }
+    @keyframes flash {
+      0% { box-shadow: 0 0 0 0 rgba(61,245,139,.35); }
+      50% { box-shadow: 0 0 0 7px rgba(61,245,139,.03), 0 0 70px rgba(61,245,139,.12); }
+      100% { box-shadow: 0 0 0 0 rgba(61,245,139,0); }
+    }
+
+    @media (max-width: 900px) {
+      .hero, .ranking { grid-template-columns:1fr; }
+      .topbar { align-items:flex-start; flex-direction:column; }
+      .big { font-size:36px; }
+      .table-card { overflow:auto; }
+      table { min-width:720px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">SA</div>
+        <div>
+          <h1>Sales Arena</h1>
+          <p>Ranking de vendas • Hotmart em tempo real</p>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="filters">
+          <button data-period="today" class="active">Hoje</button>
+          <button data-period="week">Semana</button>
+          <button data-period="month">Mês</button>
+        </div>
+        <div class="live"><span class="dot"></span> AO VIVO</div>
+      </div>
+    </div>
+
+    <section class="hero">
+      <article class="card" id="mainRevenueCard">
+        <div class="label">Faturamento atual</div>
+        <div class="big" id="revenue">R$ 0,00</div>
+        <div class="sub" id="updated">Aguardando dados da Hotmart...</div>
+      </article>
+      <article class="card">
+        <div class="label">Vendas aprovadas</div>
+        <div class="stat" id="salesCount">0</div>
+        <div class="sub">Transações no período</div>
+      </article>
+      <article class="card">
+        <div class="label">Comissão Hotmart</div>
+        <div class="stat" id="commission">R$ 0,00</div>
+        <div class="sub">Comissões recebidas no período</div>
+      </article>
+    </section>
+
+    <div class="section-head">
+      <h2>Ranking dos vendedores</h2>
+      <span>Ordenado por faturamento</span>
+    </div>
+    <section class="ranking" id="ranking"></section>
+
+    <div class="section-head">
+      <h2>Últimas vendas</h2>
+      <span>Atualização automática via webhook</span>
+    </div>
+    <section class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Horário</th>
+            <th>Vendedor</th>
+            <th>Produto</th>
+            <th>Venda</th>
+            <th>Comissão</th>
+            <th>Transação</th>
+          </tr>
+        </thead>
+        <tbody id="salesTable"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const socket = io();
+    let currentPeriod = "today";
+    let lastSalesCount = 0;
+
+    const money = (value, currency = "BRL") => {
+      try {
+        return new Intl.NumberFormat("pt-BR", {
+          style: "currency",
+          currency: currency || "BRL"
+        }).format(Number(value || 0));
+      } catch {
+        return `R$ ${Number(value || 0).toFixed(2).replace(".", ",")}`;
+      }
+    };
+
+    const time = (iso) => {
+      if (!iso) return "—";
+      return new Intl.DateTimeFormat("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(iso));
+    };
+
+    function render(data) {
+      document.querySelector("#revenue").textContent = money(data.totals.revenue);
+      document.querySelector("#salesCount").textContent = data.totals.sales;
+      document.querySelector("#commission").textContent = money(data.totals.commission);
+      document.querySelector("#updated").textContent =
+        "Atualizado às " + new Intl.DateTimeFormat("pt-BR", {
+          hour: "2-digit", minute: "2-digit", second: "2-digit"
+        }).format(new Date(data.updatedAt));
+
+      const accents = ["var(--gold)", "var(--silver)", "var(--bronze)"];
+      document.querySelector("#ranking").innerHTML = data.ranking.map((seller, index) => `
+        <article class="card seller" style="--accent:${accents[index] || "var(--purple)"}">
+          <div class="position">${index + 1}º LUGAR</div>
+          <div class="seller-name">${escapeHtml(seller.name)}</div>
+          <div class="seller-code">${escapeHtml(seller.code)}</div>
+          <div class="seller-numbers">
+            <div><b>${seller.sales}</b><small>Vendas</small></div>
+            <div><b>${money(seller.revenue)}</b><small>Faturamento</small></div>
+            <div><b>${money(seller.commission)}</b><small>Comissão</small></div>
+          </div>
+        </article>
+      `).join("");
+
+      const tbody = document.querySelector("#salesTable");
+      if (!data.recentSales.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty">Nenhuma venda aprovada neste período.</td></tr>`;
+      } else {
+        tbody.innerHTML = data.recentSales.map(sale => `
+          <tr>
+            <td>${time(sale.approvedAt)}</td>
+            <td><strong>${escapeHtml(sale.sellerName)}</strong></td>
+            <td>${escapeHtml(sale.productName)}</td>
+            <td class="money">${money(sale.revenue, sale.currency)}</td>
+            <td class="commission">${money(sale.commission)}</td>
+            <td><span class="pill">${escapeHtml(sale.transaction)}</span></td>
+          </tr>
+        `).join("");
+      }
+
+      if (data.totals.sales > lastSalesCount && lastSalesCount !== 0) {
+        const card = document.querySelector("#mainRevenueCard");
+        card.classList.remove("flash");
+        requestAnimationFrame(() => card.classList.add("flash"));
+      }
+      lastSalesCount = data.totals.sales;
+    }
+
+    function escapeHtml(value) {
+      const div = document.createElement("div");
+      div.textContent = String(value ?? "");
+      return div.innerHTML;
+    }
+
+    async function load() {
+      const res = await fetch(`/api/dashboard?period=${currentPeriod}`);
+      render(await res.json());
+    }
+
+    document.querySelectorAll("[data-period]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-period]").forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        currentPeriod = button.dataset.period;
+        lastSalesCount = 0;
+        socket.emit("dashboard:period", currentPeriod);
+      });
+    });
+
+    socket.on("dashboard:update", render);
+    load();
+  </script>
+</body>
+</html>
