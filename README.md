@@ -110,3 +110,37 @@ A venda aparece instantaneamente na tela.
 Esse projeto roda em qualquer host Node.js que exponha HTTPS e permita conexões WebSocket.
 
 Para uso operacional contínuo, recomenda-se trocar o armazenamento JSON por PostgreSQL antes de escalar para muitas transações simultâneas.
+
+
+## Comissão dos 4 produtos
+
+Edite `products.json`.
+
+Exemplo de comissão fixa de R$ 20,00 por venda:
+
+```json
+{
+  "productId": "123456",
+  "name": "Produto X",
+  "sellerCommissionType": "fixed",
+  "sellerCommissionValue": 20
+}
+```
+
+Exemplo de comissão percentual de 10%:
+
+```json
+{
+  "productId": "123456",
+  "name": "Produto X",
+  "sellerCommissionType": "percent",
+  "sellerCommissionValue": 10
+}
+```
+
+O dashboard separa:
+
+- Faturamento do Comercial Atual: valor total pago pelo comprador.
+- Comissão da Empresa: linha `PRODUCER` enviada pela Hotmart.
+- Comissão do Vendedor: regra interna de `products.json`.
+- Resultado da Empresa: Comissão da Empresa menos Comissão do Vendedor.

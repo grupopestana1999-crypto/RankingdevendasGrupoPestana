@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sales Arena • Ranking Hotmart</title>
+  <title>Ranking de Vendas Grupo Pestana</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -106,9 +106,9 @@
   <main class="wrap">
     <div class="topbar">
       <div class="brand">
-        <div class="logo">SA</div>
+        <div class="logo">GP</div>
         <div>
-          <h1>Sales Arena</h1>
+          <h1>Ranking de Vendas Grupo Pestana</h1>
           <p>Ranking de vendas • Hotmart em tempo real</p>
         </div>
       </div>
@@ -125,7 +125,7 @@
 
     <section class="hero">
       <article class="card" id="mainRevenueCard">
-        <div class="label">Faturamento atual</div>
+        <div class="label">Faturamento do Comercial Atual</div>
         <div class="big" id="revenue">R$ 0,00</div>
         <div class="sub" id="updated">Aguardando dados da Hotmart...</div>
       </article>
@@ -135,9 +135,9 @@
         <div class="sub">Transações no período</div>
       </article>
       <article class="card">
-        <div class="label">Comissão Hotmart</div>
-        <div class="stat" id="commission">R$ 0,00</div>
-        <div class="sub">Comissões recebidas no período</div>
+        <div class="label">Resultado da Empresa</div>
+        <div class="stat" id="companyResult">R$ 0,00</div>
+        <div class="sub">Comissão Hotmart − comissão dos vendedores</div>
       </article>
     </section>
 
@@ -159,7 +159,9 @@
             <th>Vendedor</th>
             <th>Produto</th>
             <th>Venda</th>
-            <th>Comissão</th>
+            <th>Comissão Empresa</th>
+            <th>Comissão Vendedor</th>
+            <th>Resultado Empresa</th>
             <th>Transação</th>
           </tr>
         </thead>
@@ -195,7 +197,7 @@
     function render(data) {
       document.querySelector("#revenue").textContent = money(data.totals.revenue);
       document.querySelector("#salesCount").textContent = data.totals.sales;
-      document.querySelector("#commission").textContent = money(data.totals.commission);
+      document.querySelector("#companyResult").textContent = money(data.totals.companyResult);
       document.querySelector("#updated").textContent =
         "Atualizado às " + new Intl.DateTimeFormat("pt-BR", {
           hour: "2-digit", minute: "2-digit", second: "2-digit"
@@ -210,14 +212,14 @@
           <div class="seller-numbers">
             <div><b>${seller.sales}</b><small>Vendas</small></div>
             <div><b>${money(seller.revenue)}</b><small>Faturamento</small></div>
-            <div><b>${money(seller.commission)}</b><small>Comissão</small></div>
+            <div><b>${money(seller.sellerCommission)}</b><small>Comissão vendedor</small></div>
           </div>
         </article>
       `).join("");
 
       const tbody = document.querySelector("#salesTable");
       if (!data.recentSales.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty">Nenhuma venda aprovada neste período.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">Nenhuma venda aprovada neste período.</td></tr>`;
       } else {
         tbody.innerHTML = data.recentSales.map(sale => `
           <tr>
@@ -225,7 +227,9 @@
             <td><strong>${escapeHtml(sale.sellerName)}</strong></td>
             <td>${escapeHtml(sale.productName)}</td>
             <td class="money">${money(sale.revenue, sale.currency)}</td>
-            <td class="commission">${money(sale.commission)}</td>
+            <td class="money">${money(sale.companyCommission)}</td>
+            <td class="commission">${money(sale.sellerCommission)}</td>
+            <td class="money">${money(sale.companyResult)}</td>
             <td><span class="pill">${escapeHtml(sale.transaction)}</span></td>
           </tr>
         `).join("");

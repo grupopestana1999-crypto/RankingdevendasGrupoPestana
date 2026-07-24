@@ -1,0 +1,26 @@
+[
+  {
+    "productId": "COLE_O_ID_DO_PRODUTO_1",
+    "name": "Produto 01",
+    "sellerCommissionType": "fixed",
+    "sellerCommissionValue": 0
+  },
+  {
+    "productId": "COLE_O_ID_DO_PRODUTO_2",
+    "name": "Produto 02",
+    "sellerCommissionType": "fixed",
+    "sellerCommissionValue": 0
+  },
+  {
+    "productId": "COLE_O_ID_DO_PRODUTO_3",
+    "name": "Produto 03",
+    "sellerCommissionType": "fixed",
+    "sellerCommissionValue": 0
+  },
+  {
+    "productId": "COLE_O_ID_DO_PRODUTO_4",
+    "name": "Produto 04",
+    "sellerCommissionType": "fixed",
+    "sellerCommissionValue": 0
+  }
+]

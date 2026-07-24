@@ -6,16 +6,30 @@ const path = require("path");
 require("dotenv").config();
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+
+// Na Vercel, o Express é exportado como uma única Function.
+// Em ambiente local, continuamos criando o servidor HTTP + Socket.IO.
+let io = {
+  to: () => ({ emit: () => {} }),
+  on: () => {}
+};
+let localServer = null;
+
+if (!process.env.VERCEL) {
+  localServer = http.createServer(app);
+  io = new Server(localServer);
+}
 
 const PORT = Number(process.env.PORT || 3000);
 const HOTMART_HOTTOK = String(process.env.HOTMART_HOTTOK || "").trim();
 const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || "").trim();
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.VERCEL
+  ? path.join("/tmp", "ranking-vendas-hotmart")
+  : path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "sales.json");
 const SELLERS_FILE = path.join(__dirname, "sellers.json");
+const PRODUCTS_FILE = path.join(__dirname, "products.json");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -35,6 +49,60 @@ function writeJsonAtomic(file, value) {
 
 function getSellers() {
   return readJson(SELLERS_FILE, []);
+}
+
+function getProducts() {
+  return readJson(PRODUCTS_FILE, []);
+}
+
+function findProductConfig(payload) {
+  const productId = String(payload?.data?.product?.id || "");
+  const productUcode = String(payload?.data?.product?.ucode || "");
+  const productName = String(payload?.data?.product?.name || "").trim().toLowerCase();
+
+  return getProducts().find((item) => {
+    const configuredId = String(item.productId || "");
+    const configuredUcode = String(item.productUcode || "");
+    const configuredName = String(item.name || "").trim().toLowerCase();
+
+    return (
+      (configuredId && configuredId === productId) ||
+      (configuredUcode && configuredUcode === productUcode) ||
+      (configuredName && configuredName === productName)
+    );
+  }) || null;
+}
+
+function producerCommission(payload) {
+  const commissions = Array.isArray(payload?.data?.commissions)
+    ? payload.data.commissions
+    : [];
+
+  const producerRows = commissions.filter(
+    (item) => String(item?.source || "").toUpperCase() === "PRODUCER"
+  );
+
+  return producerRows.reduce((sum, item) => {
+    const converted = Number(item?.currency_conversion?.converted_value);
+    if (Number.isFinite(converted)) return sum + converted;
+
+    const value = Number(item?.value);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+}
+
+function sellerCommission(payload, revenue) {
+  const config = findProductConfig(payload);
+  if (!config) return 0;
+
+  const value = Number(config.sellerCommissionValue || 0);
+  if (!Number.isFinite(value)) return 0;
+
+  if (String(config.sellerCommissionType || "fixed").toLowerCase() === "percent") {
+    return revenue * (value / 100);
+  }
+
+  return value;
 }
 
 function getSales() {
@@ -124,18 +192,24 @@ function buildSale(payload) {
   const seller = findSeller(payload);
   const purchase = payload?.data?.purchase || {};
   const product = payload?.data?.product || {};
+  const revenue = moneyValue(purchase.full_price) || moneyValue(purchase.price);
+  const companyCommission = producerCommission(payload);
+  const internalSellerCommission = sellerCommission(payload, revenue);
 
   return {
     eventId: String(payload?.id || ""),
     transaction: String(purchase.transaction || payload?.id || ""),
     status: String(purchase.status || payload?.event || "APPROVED"),
     productId: String(product.id || ""),
+    productUcode: String(product.ucode || ""),
     productName: String(product.name || "Produto Hotmart"),
     sellerId: seller?.id || "nao-identificado",
     sellerName: seller?.name || "Não identificado",
     sellerCode: seller?.code || getOriginCode(payload) || "",
-    revenue: moneyValue(purchase.full_price) || moneyValue(purchase.price),
-    commission: hotmartCommission(payload),
+    revenue,
+    companyCommission,
+    sellerCommission: internalSellerCommission,
+    companyResult: companyCommission - internalSellerCommission,
     currency:
       purchase?.full_price?.currency_value ||
       purchase?.price?.currency_value ||
@@ -193,7 +267,9 @@ function buildDashboard(period = "today") {
         ...seller,
         sales: sellerSales.length,
         revenue: sellerSales.reduce((sum, sale) => sum + sale.revenue, 0),
-        commission: sellerSales.reduce((sum, sale) => sum + sale.commission, 0),
+        companyCommission: sellerSales.reduce((sum, sale) => sum + Number(sale.companyCommission || 0), 0),
+        sellerCommission: sellerSales.reduce((sum, sale) => sum + Number(sale.sellerCommission || 0), 0),
+        companyResult: sellerSales.reduce((sum, sale) => sum + Number(sale.companyResult || 0), 0),
         lastSaleAt: sellerSales[0]?.approvedAt || null
       };
     })
@@ -205,7 +281,9 @@ function buildDashboard(period = "today") {
     totals: {
       sales: sales.length,
       revenue: sales.reduce((sum, sale) => sum + sale.revenue, 0),
-      commission: sales.reduce((sum, sale) => sum + sale.commission, 0)
+      companyCommission: sales.reduce((sum, sale) => sum + Number(sale.companyCommission || 0), 0),
+      sellerCommission: sales.reduce((sum, sale) => sum + Number(sale.sellerCommission || 0), 0),
+      companyResult: sales.reduce((sum, sale) => sum + Number(sale.companyResult || 0), 0)
     },
     ranking,
     recentSales: [...sales]
@@ -224,7 +302,19 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, now: new Date().toISOString() });
+  res.json({
+    ok: true,
+    environment: process.env.VERCEL ? "vercel" : "local",
+    hottokConfigured: Boolean(HOTMART_HOTTOK),
+    now: new Date().toISOString()
+  });
+});
+
+app.get("/webhook/hotmart", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    message: "Endpoint Hotmart ativo. Use POST para enviar eventos."
+  });
 });
 
 app.get("/api/dashboard", (req, res) => {
@@ -315,7 +405,9 @@ app.post("/api/simulate-sale", (req, res) => {
     sellerName: seller.name,
     sellerCode: seller.code,
     revenue,
-    commission,
+    companyCommission: revenue,
+    sellerCommission: commission,
+    companyResult: revenue - commission,
     currency: "BRL",
     approvedAt: new Date().toISOString(),
     event: "PURCHASE_APPROVED"
@@ -329,20 +421,26 @@ app.post("/api/simulate-sale", (req, res) => {
   res.json({ ok: true, sale });
 });
 
-io.on("connection", (socket) => {
-  let currentRoom = "period:today";
-  socket.join(currentRoom);
-
-  socket.on("dashboard:period", (period) => {
-    if (!["today", "week", "month"].includes(period)) return;
-    socket.leave(currentRoom);
-    currentRoom = `period:${period}`;
+if (!process.env.VERCEL) {
+  io.on("connection", (socket) => {
+    let currentRoom = "period:today";
     socket.join(currentRoom);
-    socket.emit("dashboard:update", buildDashboard(period));
-  });
-});
 
-server.listen(PORT, () => {
-  console.log(`Ranking Hotmart rodando em http://localhost:${PORT}`);
-  console.log(`Webhook: http://localhost:${PORT}/webhook/hotmart`);
-});
+    socket.on("dashboard:period", (period) => {
+      if (!["today", "week", "month"].includes(period)) return;
+      socket.leave(currentRoom);
+      currentRoom = `period:${period}`;
+      socket.join(currentRoom);
+      socket.emit("dashboard:update", buildDashboard(period));
+    });
+  });
+
+  localServer.listen(PORT, () => {
+    console.log(`Ranking Hotmart rodando em http://localhost:${PORT}`);
+    console.log(`Webhook: http://localhost:${PORT}/webhook/hotmart`);
+  });
+}
+
+// ESSENCIAL PARA VERCEL:
+// a plataforma detecta server.js e transforma este Express app em uma Function.
+module.exports = app;
